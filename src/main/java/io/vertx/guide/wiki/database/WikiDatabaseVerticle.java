@@ -30,14 +30,6 @@ public class WikiDatabaseVerticle extends AbstractVerticle {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WikiDatabaseVerticle.class);
 
-    private enum SqlQuery {
-        CREATE_PAGES_TABLE, ALL_PAGES, GET_PAGE, CREATE_PAGE, SAVE_PAGE, DELETE_PAGE
-    }
-
-    public enum ErrorCodes {
-        NO_ACTION_SPECIFIED, BAD_ACTION, DB_ERROR
-    }
-
     private final HashMap<SqlQuery, String> sqlQueries = new HashMap<>();
 
     private JDBCClient dbClient;
