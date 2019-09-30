@@ -20,7 +20,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/* AbstractVerticle provê:
+/* AbstractVerticle prove:
 - life-cycle start and stop methods to override,
 - a protected field called vertx that references the Vert.x environment where the verticle is being deployed,
 - an accessor to some configuration object that allows passing external configuration to a verticle.
