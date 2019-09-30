@@ -35,54 +35,18 @@ public class MainVerticle extends AbstractVerticle {
   private static final String SQL_ALL_PAGES = "select Name from Pages";
   private static final String SQL_DELETE_PAGE = "delete from Pages where Id = ?";
 
-  // We expose public constants for the verticle configuration parameters:
-  // the HTTP port number and the name of the event bus destination to post
-  // messages to the database verticle.
-  public static final String CONFIG_HTTP_SERVER_PORT = "http.server.port";
-  public static final String CONFIG_WIKIDB_QUEUE = "wikidb.queue";
 
-  private String wikiDbQueue = "wikidb.queue";
+
+
 
   private JDBCClient dbClient; // serves as the connection to the database
-  private FreeMarkerTemplateEngine templateEngine;
 
-  private static final String EMPTY_PAGE_MARKDOWN = "# A new page\n" + "\n" + "Feel-free to write in Markdown!\n";
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(MainVerticle.class); // create a general-purpose logger
-                                                                                    // from the org.slf4j package:
 
-  @Override
-  public void start(Promise<Void> promise) throws Exception {
-    // e AbstractVerticle#config() method allows accessing the verticle
-    // configuration that has been provided.
-    // The second parameter is a default value in case no specific value was given.
-    wikiDbQueue = config().getString(CONFIG_WIKIDB_QUEUE, "wikidb.queue");
 
-    HttpServer server = vertx.createHttpServer();
 
-    Router router = Router.router(vertx);
-    router.get("/").handler(this::indexHandler);
-    router.get("/wiki/:page").handler(this::pageRenderingHandler);
-    router.post().handler(BodyHandler.create());
-    router.post("/save").handler(this::pageUpdateHandler);
-    router.post("/create").handler(this::pageCreateHandler);
-    router.post("/delete").handler(this::pageDeletionHandler);
 
-    templateEngine = FreeMarkerTemplateEngine.create(vertx);
-
-    // Configuration values can not just be String objects but also integers,
-    // boolean values, complex JSON data, etc.
-    int portNumber = config().getInteger(CONFIG_HTTP_SERVER_PORT, 8080);
-    server.requestHandler(router).listen(portNumber, ar -> {
-      if (ar.succeeded()) {
-        LOGGER.info("HTTP server running on port " + portNumber);
-        promise.complete();
-      } else {
-        LOGGER.error("Could not start a HTTP server", ar.cause());
-        promise.fail(ar.cause());
-      }
-    });
-  }
+  
 
   /*
    * Cada fase abaixo pode falhar: Each phase can fail (e.g., the HTTP server TCP
@@ -192,31 +156,7 @@ public class MainVerticle extends AbstractVerticle {
     return promise.future();
   }
 
-  private void indexHandler(RoutingContext context) {
-
-    // Delivery options allow us to specify headers, payload codecs and timeouts.
-    DeliveryOptions options = new DeliveryOptions().addHeader("action", "all-pages");
-
-    // The vertx object gives access to the event bus, and we send a message to the
-    // queue for the database verticle.
-    vertx.eventBus().request(wikiDbQueue, new JsonObject(), options, reply -> {
-      if (reply.succeeded()) {
-        JsonObject body = (JsonObject) reply.result().body(); // Upon success a reply contains a payload.
-        context.put("title", "Wiki home");
-        context.put("pages", body.getJsonArray("pages").getList());
-        templateEngine.render(context.data(), "templates/index.ftl", ar -> {
-          if (ar.succeeded()) {
-            context.response().putHeader("Content-Type", "text/html");
-            context.response().end(ar.result());
-          } else {
-            context.fail(ar.cause());
-          }
-        });
-      } else {
-        context.fail(reply.cause());
-      }
-    });
-  }
+  
 
   private void pageRenderingHandler(RoutingContext context) {
 
