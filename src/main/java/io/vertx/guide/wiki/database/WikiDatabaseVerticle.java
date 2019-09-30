@@ -1,4 +1,4 @@
-package io.vertx.guide.wiki;
+package io.vertx.guide.wiki.database;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;

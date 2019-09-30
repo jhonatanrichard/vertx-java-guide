@@ -1,4 +1,4 @@
-package io.vertx.guide.wiki;
+package io.vertx.guide.wiki.http;
 
 import com.github.rjeschke.txtmark.Processor;
 import io.vertx.core.AbstractVerticle;
@@ -10,6 +10,8 @@ import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 import io.vertx.ext.web.templ.freemarker.FreeMarkerTemplateEngine;
+import io.vertx.guide.wiki.MainVerticle;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

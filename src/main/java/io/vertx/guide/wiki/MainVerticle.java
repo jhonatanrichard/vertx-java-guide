@@ -2,8 +2,8 @@ package io.vertx.guide.wiki;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.DeploymentOptions;
-import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.guide.wiki.database.WikiDatabaseVerticle;
 
 /* AbstractVerticle prove:
 - life-cycle start and stop methods to override,
@@ -28,7 +28,7 @@ public class MainVerticle extends AbstractVerticle {
 
       Promise<String> httpVerticleDeployment = Promise.promise();
       vertx.deployVerticle(
-        "io.vertx.guide.wiki.HttpServerVerticle",  // 4. A class name as a string is also an option to specify a verticle to deploy. For other JVM languages string-based conventions allow a module / script to be specified.
+        "io.vertx.guide.wiki.http.HttpServerVerticle",  // 4. A class name as a string is also an option to specify a verticle to deploy. For other JVM languages string-based conventions allow a module / script to be specified.
         new DeploymentOptions().setInstances(2),    // 5. The DeploymentOption class allows to specify a number of parameters and especially the number of instances to deploy.
         httpVerticleDeployment);
 
