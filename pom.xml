@@ -14,7 +14,7 @@
     <main.verticle>io.vertx.guide.wiki.MainVerticle</main.verticle>
   </properties>
 
-  <dependencyManagement>
+<dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>io.vertx</groupId>
@@ -30,17 +30,6 @@
     <dependency>
       <groupId>io.vertx</groupId>
       <artifactId>vertx-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.12</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.vertx</groupId>
-      <artifactId>vertx-unit</artifactId>
-      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>io.vertx</groupId>
@@ -63,6 +52,22 @@
       <groupId>org.hsqldb</groupId>
       <artifactId>hsqldb</artifactId>
       <version>2.3.4</version>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>1.2.3</version>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.12</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-unit</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
