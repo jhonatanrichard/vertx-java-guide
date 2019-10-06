@@ -54,6 +54,6 @@ public interface WikiDatabaseService {
 
     @GenIgnore
     static WikiDatabaseService createProxy(Vertx vertx, String address) {
-        return new WikiDatabaseServiceVertxEBProxy(vertx, address);
+        return new WikiDatabaseServiceVertxEBProxy(vertx, address); // The Vert.x code generator creates the proxy class and names it by suffixing with VertxEBProxy.
     }
 }
