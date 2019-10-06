@@ -147,6 +147,11 @@ public class WikiDatabaseServiceVertxProxyHandler extends ProxyHandler {
           service.fetchAllPagesData(HelperUtils.createListHandler(msg));
           break;
         }
+        case "fetchPageById": {
+          service.fetchPageById(json.getValue("id") == null ? null : (json.getLong("id").intValue()),
+                        HelperUtils.createHandler(msg));
+          break;
+        }
         default: throw new IllegalStateException("Invalid action: " + action);
       }
     } catch (Throwable t) {

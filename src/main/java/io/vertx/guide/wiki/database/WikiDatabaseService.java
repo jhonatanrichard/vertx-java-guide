@@ -60,4 +60,7 @@ public interface WikiDatabaseService {
     static WikiDatabaseService createProxy(Vertx vertx, String address) {
         return new WikiDatabaseServiceVertxEBProxy(vertx, address); // The Vert.x code generator creates the proxy class and names it by suffixing with VertxEBProxy.
     }
+
+    @Fluent
+    WikiDatabaseService fetchPageById(int id, Handler<AsyncResult<JsonObject>> resultHandler);
 }
