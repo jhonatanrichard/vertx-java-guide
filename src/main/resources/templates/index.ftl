@@ -25,6 +25,16 @@
   <#else>
     <p>The wiki is currently empty!</p>
   </#list>
+  <#if backup_gist_url?has_content>
+    <div class="alert alert-success" role="alert">
+      Successfully created a backup:
+      <a href="${backup_gist_url}" class="alert-link">${backup_gist_url}</a>
+    </div>
+  <#else>
+    <p>
+      <a class="btn btn-outline-secondary btn-sm" href="/backup" role="button" aria-pressed="true">Backup</a>
+    </p>
+  </#if>
   </div>
 
 </div>

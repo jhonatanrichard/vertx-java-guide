@@ -131,6 +131,7 @@ class WikiDatabaseServiceImpl implements WikiDatabaseService {
   public WikiDatabaseService fetchAllPagesData(Handler<AsyncResult<List<JsonObject>>> resultHandler) {
     dbClient.query(sqlQueries.get(SqlQuery.ALL_PAGES_DATA), queryResult -> {
       if (queryResult.succeeded()) {
+        System.out.println("sucesso no result query");
         resultHandler.handle(Future.succeededFuture(queryResult.result().getRows()));
       } else {
         LOGGER.error("Database query error", queryResult.cause());
