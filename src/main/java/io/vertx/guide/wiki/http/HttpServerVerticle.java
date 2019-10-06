@@ -3,8 +3,10 @@ package io.vertx.guide.wiki.http;
 import com.github.rjeschke.txtmark.Processor;
 import io.vertx.core.*;
 import io.vertx.core.http.HttpServer;
+import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.net.JksOptions;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.HttpResponse;
@@ -54,8 +56,12 @@ public class HttpServerVerticle extends AbstractVerticle {
     // cria um objeto web client para tratar HTTP requests na API do Gist
     webClient = WebClient.create(vertx, new WebClientOptions().setSsl(true).setUserAgent("vert-x3"));
 
-    HttpServer server = vertx.createHttpServer();
-
+    HttpServer server = vertx.createHttpServer(new HttpServerOptions()
+        .setSsl(true)
+        .setKeyStoreOptions(new JksOptions()
+          .setPath("server-keystore.jks")
+          .setPassword("secret")));
+      
     Router router = Router.router(vertx);
     router.get("/").handler(this::indexHandler);
     router.get("/backup").handler(this::backupHandler);
