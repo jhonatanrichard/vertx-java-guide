@@ -12,6 +12,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.ext.jdbc.JDBCClient;
 
 import java.util.HashMap;
+import java.util.List;
 
 @ProxyGen // The ProxyGen annotation is used to trigger the code generation of a proxy for
           // clients of that service.
@@ -45,6 +46,9 @@ public interface WikiDatabaseService {
 
     @Fluent
     WikiDatabaseService deletePage(int id, Handler<AsyncResult<Void>> resultHandler);
+
+    @Fluent
+    WikiDatabaseService fetchAllPagesData(Handler<AsyncResult<List<JsonObject>>> resultHandler);
 
     @GenIgnore
     static WikiDatabaseService create(JDBCClient dbClient, HashMap<SqlQuery, String> sqlQueries,

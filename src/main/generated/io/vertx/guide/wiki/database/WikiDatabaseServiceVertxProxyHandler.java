@@ -42,6 +42,7 @@ import io.vertx.serviceproxy.ServiceExceptionMessageCodec;
 import io.vertx.serviceproxy.HelperUtils;
 
 import io.vertx.core.json.JsonArray;
+import java.util.List;
 import io.vertx.core.json.JsonObject;
 import io.vertx.guide.wiki.database.WikiDatabaseService;
 import io.vertx.core.AsyncResult;
@@ -140,6 +141,10 @@ public class WikiDatabaseServiceVertxProxyHandler extends ProxyHandler {
         case "deletePage": {
           service.deletePage(json.getValue("id") == null ? null : (json.getLong("id").intValue()),
                         HelperUtils.createHandler(msg));
+          break;
+        }
+        case "fetchAllPagesData": {
+          service.fetchAllPagesData(HelperUtils.createListHandler(msg));
           break;
         }
         default: throw new IllegalStateException("Invalid action: " + action);

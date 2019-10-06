@@ -24,7 +24,7 @@ public class WikiDatabaseVerticleTest {
   public void prepare(TestContext context) throws InterruptedException {
     vertx = Vertx.vertx();
 
-    JsonObject conf = new JsonObject() // We only override some of the verticle settings, the others will have default values.
+    JsonObject conf = new JsonObject() // Nós somente sobrescrevemos algumas das configurações do verticle, as outras continuam as default
         .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true")
         .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
 
