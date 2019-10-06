@@ -95,9 +95,13 @@
       <version>${vertx.version}</version>
     </dependency>
     <dependency>
-  <groupId>io.vertx</groupId>
-  <artifactId>vertx-auth-jdbc</artifactId>
-</dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-auth-jdbc</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.vertx</groupId>
+      <artifactId>vertx-auth-jwt</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

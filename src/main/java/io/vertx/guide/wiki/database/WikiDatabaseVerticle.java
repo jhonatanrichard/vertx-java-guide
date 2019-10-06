@@ -4,6 +4,7 @@ import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.jdbc.JDBCClient;
+import io.vertx.guide.wiki.DatabaseConstants;
 import io.vertx.serviceproxy.ServiceBinder;
 
 import java.io.FileInputStream;
@@ -12,7 +13,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Properties;
 
-public class WikiDatabaseVerticle extends AbstractVerticle implements io.vertx.guide.wiki.DatabaseConstants {
+public class WikiDatabaseVerticle extends AbstractVerticle implements DatabaseConstants {
 
   public static final String CONFIG_WIKIDB_SQL_QUERIES_RESOURCE_FILE = "wikidb.sqlqueries.resource.file";
   public static final String CONFIG_WIKIDB_QUEUE = "wikidb.queue";

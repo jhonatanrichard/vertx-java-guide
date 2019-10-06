@@ -26,6 +26,7 @@ public class ApiTest {
 
   private Vertx vertx;
   private WebClient webClient;
+  private String jwtTokenHeaderValue;
 
   @Before
   // The HTTP server verticle needs the database verticle to be running, so we need to deploy both in our test Vert.x context
@@ -35,6 +36,9 @@ public class ApiTest {
     JsonObject dbConf = new JsonObject()
       .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true") // 1. We use a different JDBC URL to use an in-memory database for the tests.
       .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
+
+    vertx.deployVerticle(new AuthInitializerVerticle(),
+      new DeploymentOptions().setConfig(dbConf), context.asyncAssertSuccess());
 
     vertx.deployVerticle(new WikiDatabaseVerticle(),
       new DeploymentOptions().setConfig(dbConf), context.asyncAssertSuccess());
@@ -58,22 +62,38 @@ public class ApiTest {
   public void play_with_api(TestContext context) {
     Async async = context.async();
 
+    Promise<HttpResponse<String>> tokenPromise = Promise.promise();
+    webClient.get("/api/token")
+      .putHeader("login", "foo")  // 1. Credentials are passed as headers.
+      .putHeader("password", "bar")
+      .as(BodyCodec.string())   // 2. The response payload is of text/plain type, so we use that for the body decoding codec.
+      .send(tokenPromise);
+    Future<HttpResponse<String>> tokenFuture = tokenPromise.future(); // 3. Upon success we complete the tokenRequest future with the token value.
+
     JsonObject page = new JsonObject()
       .put("name", "Sample")
       .put("markdown", "# A page");
+    // (...)
 
-    Promise<HttpResponse<JsonObject>> postPagePromise = Promise.promise();
-    webClient.post("/api/pages")
-      .as(BodyCodec.jsonObject())
-      .sendJsonObject(page, postPagePromise);
+    Future<HttpResponse<JsonObject>> postPageFuture = tokenFuture.compose(tokenResponse -> {
+      Promise<HttpResponse<JsonObject>> promise = Promise.promise();
+      jwtTokenHeaderValue = "Bearer " + tokenResponse.body();   // 1. We store the token with the Bearer prefix to the field for the next requests.
+      webClient.post("/api/pages")
+        .putHeader("Authorization", jwtTokenHeaderValue)  // 2. We pass the token as a header.
+        .as(BodyCodec.jsonObject())
+        .sendJsonObject(page, promise);
+      return promise.future();
+    });
 
-    Future<HttpResponse<JsonObject>> getPageFuture = postPagePromise.future().compose(resp -> {
+    Future<HttpResponse<JsonObject>> getPageFuture = postPageFuture.compose(resp -> {
       Promise<HttpResponse<JsonObject>> promise = Promise.promise();
       webClient.get("/api/pages")
+        .putHeader("Authorization", jwtTokenHeaderValue)
         .as(BodyCodec.jsonObject())
         .send(promise);
       return promise.future();
     });
+    // (...)
 
     Future<HttpResponse<JsonObject>> updatePageFuture = getPageFuture.compose(resp -> {
       JsonArray array = resp.body().getJsonArray("pages");
@@ -84,6 +104,7 @@ public class ApiTest {
         .put("id", 0)
         .put("markdown", "Oh Yeah!");
       webClient.put("/api/pages/0")
+        .putHeader("Authorization", jwtTokenHeaderValue)
         .as(BodyCodec.jsonObject())
         .sendJsonObject(data, promise);
       return promise.future();
@@ -93,6 +114,7 @@ public class ApiTest {
       context.assertTrue(resp.body().getBoolean("success"));
       Promise<HttpResponse<JsonObject>> promise = Promise.promise();
       webClient.delete("/api/pages/0")
+        .putHeader("Authorization", jwtTokenHeaderValue)
         .as(BodyCodec.jsonObject())
         .send(promise);
       return promise.future();
