@@ -46,155 +46,73 @@ public class HttpServerVerticle extends AbstractVerticle {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HttpServerVerticle.class); // create a general-purpose
                                                                                           // logger
-  // from the org.slf4j package:
-
-  private static final String EMPTY_PAGE_MARKDOWN = "# A new page\n" + "\n" + "Feel-free to write in Markdown!\n";
-
-  private FreeMarkerTemplateEngine templateEngine;
 
   private WikiDatabaseService dbService;
 
-  private WebClient webClient;
+  @Override
+  public void start(Promise<Void> promise) throws Exception {
 
-@Override
-public void start(Promise<Void> promise) throws Exception {
+    String wikiDbQueue = config().getString(CONFIG_WIKIDB_QUEUE, "wikidb.queue");
+    dbService = io.vertx.guide.wiki.database.WikiDatabaseService.createProxy(vertx.getDelegate(), wikiDbQueue);
 
-  String wikiDbQueue = config().getString(CONFIG_WIKIDB_QUEUE, "wikidb.queue");
-  dbService = io.vertx.guide.wiki.database.WikiDatabaseService.createProxy(vertx.getDelegate(), wikiDbQueue);
-  // end::rx-vertx-delegate[]
+    HttpServer server = vertx.createHttpServer();
 
-  webClient = WebClient.create(vertx, new WebClientOptions()
-    .setSsl(true)
-    .setUserAgent("vert-x3"));
+    Router router = Router.router(vertx);
 
-  HttpServer server = vertx.createHttpServer(new HttpServerOptions()
-    .setSsl(true)
-    .setKeyStoreOptions(new JksOptions()
-      .setPath("server-keystore.jks")
-      .setPassword("secret")));
+    router.route().handler(BodyHandler.create());
+    router.route().handler(SessionHandler.create(LocalSessionStore.create(vertx)));
 
-  JDBCClient dbClient = JDBCClient.createShared(vertx, new JsonObject()
-    .put("url", config().getString(CONFIG_WIKIDB_JDBC_URL, DEFAULT_WIKIDB_JDBC_URL))
-    .put("driver_class", config().getString(CONFIG_WIKIDB_JDBC_DRIVER_CLASS, DEFAULT_WIKIDB_JDBC_DRIVER_CLASS))
-    .put("max_pool_size", config().getInteger(CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, DEFAULT_JDBC_MAX_POOL_SIZE)));
+    // assets estáticos
+    router.get("/app/*").handler(StaticHandler.create().setCachingEnabled(false)); // <1> <2>
+    router.get("/").handler(context -> context.reroute("/app/index.html"));
 
-  JDBCAuth auth = JDBCAuth.create(vertx, dbClient);
-
-  Router router = Router.router(vertx);
-
-  router.route().handler(BodyHandler.create());
-  router.route().handler(SessionHandler.create(LocalSessionStore.create(vertx)).setAuthProvider(auth));
-
-  AuthHandler authHandler = RedirectAuthHandler.create(auth, "/login");
-  router.route("/").handler(authHandler);
-  router.route("/wiki/*").handler(authHandler);
-  router.route("/action/*").handler(authHandler);
-
-  router.get("/").handler(this::indexHandler);
-  router.get("/wiki/:page").handler(this::pageRenderingHandler);
-  router.post("/action/save").handler(this::pageUpdateHandler);
-  router.post("/action/create").handler(this::pageCreateHandler);
-  router.get("/action/backup").handler(this::backupHandler);
-  router.post("/action/delete").handler(this::pageDeletionHandler);
-
-  router.get("/login").handler(this::loginHandler);
-  router.post("/login-auth").handler(FormLoginHandler.create(auth));
-
-  router.get("/logout").handler(context -> {
-    context.clearUser();
-    context.response()
-      .setStatusCode(302)
-      .putHeader("Location", "/")
-      .end();
-  });
-
-  JWTAuth jwtAuth = JWTAuth.create(vertx, new JWTAuthOptions()
-    .addPubSecKey(new PubSecKeyOptions()
-      .setAlgorithm("HS256")
-      .setPublicKey("secret")
-      .setSymmetric(true)));
-
-  Router apiRouter = Router.router(vertx);
-  templateEngine = FreeMarkerTemplateEngine.create(vertx);
-
-  apiRouter.route().handler(JWTAuthHandler.create(jwtAuth, "/api/token"));
-
-  apiRouter.get("/token").handler(context -> {
-
-    JsonObject creds = new JsonObject()
-      .put("username", context.request().getHeader("login"))
-      .put("password", context.request().getHeader("password"));
-
-    auth.rxAuthenticate(creds).flatMap(user -> {
-      Single<Boolean> create = user.rxIsAuthorized("create"); // 1. Three Single objects are created, representing the different authorization queries.
-      Single<Boolean> delete = user.rxIsAuthorized("delete");
-      Single<Boolean> update = user.rxIsAuthorized("update");
-
-      return Single.zip(create, delete, update, (canCreate, canDelete, canUpdate) -> { // 2. When the three operations complete successfully, the zip operator callback is invoked with the results
-        return jwtAuth.generateToken(
-          new JsonObject()
-            .put("username", context.request().getHeader("login"))
-            .put("canCreate", canCreate)
-            .put("canDelete", canDelete)
-            .put("canUpdate", canUpdate),
-          new JWTOptions()
-            .setSubject("Wiki API")
-            .setIssuer("Vert.x"));
-      });
-    }).subscribe(token -> {
-      context.response().putHeader("Content-Type", "text/plain").end(token);
-    }, t -> context.fail(401));
-
-  });
-
-  apiRouter.get("/pages").handler(this::apiRoot);
-  apiRouter.get("/pages/:id").handler(this::apiGetPage);
-  apiRouter.post().handler(BodyHandler.create());
-  apiRouter.post("/pages").handler(this::apiCreatePage);
-  apiRouter.put().handler(BodyHandler.create());
-  apiRouter.put("/pages/:id").handler(this::apiUpdatePage);
-  apiRouter.delete("/pages/:id").handler(this::apiDeletePage);
-  router.mountSubRouter("/api", apiRouter);
-
-  int portNumber = config().getInteger(CONFIG_HTTP_SERVER_PORT, 8080);
-  server
-    .requestHandler(router)
-    .rxListen(portNumber)
-    .subscribe(s -> {
-      LOGGER.info("HTTP server running on port " + portNumber);
-      promise.complete();
-    }, t -> {
-      LOGGER.error("Could not start a HTTP server", t);
-      promise.fail(t);
+    // renderização
+    router.post("/app/markdown").handler(context -> {
+      String html = Processor.process(context.getBodyAsString());
+      context.response()
+        .putHeader("Content-Type", "text/html")
+        .setStatusCode(200)
+        .end(html);
     });
-  } 
-  private Completable checkAuthorised(RoutingContext context, String authority) {
-    return context.user().rxIsAuthorized(authority)
-      .flatMapCompletable(authorized -> authorized ? Completable.complete() : Completable.error(new UnauthorizedThrowable(authority)));
+
+    // rotas
+    router.get("/api/pages").handler(this::apiRoot);
+    router.get("/api/pages/:id").handler(this::apiGetPage);
+    router.post().handler(BodyHandler.create());
+    router.post("/api/pages").handler(this::apiCreatePage);
+    router.put().handler(BodyHandler.create());
+    router.put("/api/pages/:id").handler(this::apiUpdatePage);
+    router.delete("/api/pages/:id").handler(this::apiDeletePage);
+
+    int portNumber = config().getInteger(CONFIG_HTTP_SERVER_PORT, 8080);
+    server
+      .requestHandler(router)
+      .rxListen(portNumber)
+      .subscribe(s -> {
+        LOGGER.info("HTTP server running on port " + portNumber);
+        promise.complete();
+      }, t -> {
+        LOGGER.error("Could not start a HTTP server", t);
+        promise.fail(t);
+      });
   }
 
   private void apiDeletePage(RoutingContext context) {
-    if (context.user().principal().getBoolean("canDelete", false)) {
-      int id = Integer.valueOf(context.request().getParam("id"));
-      dbService.rxDeletePage(id)
-        .subscribe(() -> apiResponse(context, 200, null, null), t -> apiFailure(context, t));
-    } else {
-      context.fail(401);
-    }
+    int id = Integer.valueOf(context.request().getParam("id"));
+    dbService.rxDeletePage(id).subscribe(
+      () -> apiResponse(context, 200, null, null),
+      t -> apiFailure(context, t));
   }
 
   private void apiUpdatePage(RoutingContext context) {
-    if (context.user().principal().getBoolean("canUpdate", false)) {
-      int id = Integer.valueOf(context.request().getParam("id"));
-      JsonObject page = context.getBodyAsJson();
-      if (!validateJsonPageDocument(context, page, "markdown")) {
-        return;
-      }
-      dbService.rxSavePage(id, page.getString("markdown"))
-        .subscribe(() -> apiResponse(context, 200, null, null), t -> apiFailure(context, t));
-    } else {
-      context.fail(401);
+    int id = Integer.valueOf(context.request().getParam("id"));
+    JsonObject page = context.getBodyAsJson();
+    if (!validateJsonPageDocument(context, page, "markdown")) {
+      return;
     }
+    dbService.rxSavePage(id, page.getString("markdown")).subscribe(
+      () -> apiResponse(context, 200, null, null),
+      t -> apiFailure(context, t));
   }
 
   private boolean validateJsonPageDocument(RoutingContext context, JsonObject page, String... expectedKeys) {
@@ -211,16 +129,13 @@ public void start(Promise<Void> promise) throws Exception {
   }
 
   private void apiCreatePage(RoutingContext context) {
-    if (context.user().principal().getBoolean("canCreate", false)) {
-      JsonObject page = context.getBodyAsJson();
-      if (!validateJsonPageDocument(context, page, "name", "markdown")) {
-        return;
-      }
-      dbService.rxCreatePage(page.getString("name"), page.getString("markdown"))
-        .subscribe(() -> apiResponse(context, 201, null, null), t -> apiFailure(context, t));
-    } else {
-      context.fail(401);
+    JsonObject page = context.getBodyAsJson();
+    if (!validateJsonPageDocument(context, page, "name", "markdown")) {
+      return;
     }
+    dbService.rxCreatePage(page.getString("name"), page.getString("markdown")).subscribe(
+      () -> apiResponse(context, 201, null, null),
+      t -> apiFailure(context, t));
   }
 
   private void apiGetPage(RoutingContext context) {
@@ -254,7 +169,9 @@ public void start(Promise<Void> promise) throws Exception {
     context.response().setStatusCode(statusCode);
     context.response().putHeader("Content-Type", "application/json");
     JsonObject wrapped = new JsonObject().put("success", true);
-    if (jsonField != null && jsonData != null) wrapped.put(jsonField, jsonData);
+    if (jsonField != null && jsonData != null) {
+      wrapped.put(jsonField, jsonData);
+    }
     context.response().end(wrapped.encode());
   }
 
@@ -268,156 +185,5 @@ public void start(Promise<Void> promise) throws Exception {
     context.response().end(new JsonObject()
       .put("success", false)
       .put("error", error).encode());
-  }
-
-  private void indexHandler(RoutingContext context) {
-    context.user().rxIsAuthorized("create")
-      .flatMap(canCreatePage -> {
-        context.put("canCreatePage", canCreatePage);
-        return dbService.rxFetchAllPages();
-      })
-      .flatMap(result -> {
-        context.put("title", "Wiki home");
-        context.put("pages", result.getList());
-        context.put("username", context.user().principal().getString("username"));
-        return templateEngine.rxRender(context.data(), "templates/index.ftl");
-      })
-      .subscribe(markup -> {
-        context.response().putHeader("Content-Type", "text/html");
-        context.response().end(markup);
-      }, context::fail);
-  }
-
-  private void pageRenderingHandler(RoutingContext context) {
-    User user = context.user();
-    user.rxIsAuthorized("update")
-      .flatMap(canSavePage -> {
-        context.put("canSavePage", canSavePage);
-        return user.rxIsAuthorized("delete");
-      })
-      .flatMap(canDeletePage -> {
-        context.put("canDeletePage", canDeletePage);
-        String requestedPage = context.request().getParam("page");
-        context.put("title", requestedPage);
-        return dbService.rxFetchPage(requestedPage);
-      })
-      .flatMap(payLoad -> {
-        boolean found = payLoad.getBoolean("found");
-        String rawContent = payLoad.getString("rawContent", EMPTY_PAGE_MARKDOWN);
-        context.put("id", payLoad.getInteger("id", -1));
-        context.put("newPage", found ? "no" : "yes");
-        context.put("rawContent", rawContent);
-        context.put("content", Processor.process(rawContent));
-        context.put("timestamp", new Date().toString());
-        context.put("username", user.principal().getString("username"));
-        return templateEngine.rxRender(context.data(), "templates/page.ftl");
-      })
-      .subscribe(
-        markup -> {
-          context.response().putHeader("Content-Type", "text/html");
-          context.response().end(markup);
-        },
-        context::fail);
-  }
-
-  private void loginHandler(RoutingContext context) {
-    context.put("title", "Login");
-    templateEngine.rxRender(context.data(), "templates/login.ftl")
-      .subscribe(markup -> {
-        context.response().putHeader("Content-Type", "text/html");
-        context.response().end(markup);
-      }, context::fail);
-  }
-
-  private void pageUpdateHandler(RoutingContext context) {
-    String title = context.request().getParam("title");
-    boolean pageCreation = "yes".equals(context.request().getParam("newPage"));
-    String markdown = context.request().getParam("markdown");
-    checkAuthorised(context, pageCreation ? "create" : "update")
-      .andThen(pageCreation ? dbService.rxCreatePage(title, markdown) : dbService.rxSavePage(Integer.valueOf(context.request().getParam("id")), markdown))
-      .subscribe(() -> {
-        context.response().setStatusCode(303);
-        context.response().putHeader("Location", "/wiki/" + title);
-        context.response().end();
-      }, t -> onError(context, t));
-  }
-
-  private void pageCreateHandler(RoutingContext context) {
-    String pageName = context.request().getParam("name");
-    String location = "/wiki/" + pageName;
-    if (pageName == null || pageName.isEmpty()) {
-      location = "/";
-    }
-    context.response().setStatusCode(303);
-    context.response().putHeader("Location", location);
-    context.response().end();
-  }
-
-  private void pageDeletionHandler(RoutingContext context) {
-    checkAuthorised(context, "delete")
-      .andThen(dbService.rxDeletePage(Integer.valueOf(context.request().getParam("id"))))
-      .subscribe(() -> {
-        context.response().setStatusCode(303);
-        context.response().putHeader("Location", "/");
-        context.response().end();
-      }, t -> onError(context, t));
-  }
-
-  private void backupHandler(RoutingContext context) {
-    checkAuthorised(context, "role:writer")
-      .andThen(dbService.rxFetchAllPagesData())
-      .map(pages -> {
-        JsonArray filesObject = new JsonArray();
-        JsonObject payload = new JsonObject()
-          .put("files", filesObject)
-          .put("language", "plaintext")
-          .put("title", "vertx-wiki-backup")
-          .put("public", true);
-        pages.forEach(page -> {
-          JsonObject fileObject = new JsonObject();
-          fileObject.put("name", page.getString("NAME"));
-          fileObject.put("content", page.getString("CONTENT"));
-          filesObject.add(fileObject);
-        });
-        return payload;
-      })
-      .flatMap(body -> webClient
-        .post(443, "snippets.glot.io", "/snippets")
-        .putHeader("User-Agent", "vert-x3")
-        .putHeader("Content-Type", "application/json")
-        .as(BodyCodec.jsonObject())
-        .rxSendJsonObject(body))
-      .subscribe(response -> {
-        if (response.statusCode() == 200) {
-          String url = "https://glot.io/snippets/" + response.body().getString("id");
-          context.put("backup_gist_url", url);
-          indexHandler(context);
-        } else {
-          StringBuilder message = new StringBuilder()
-            .append("Could not backup the wiki: ")
-            .append(response.statusMessage());
-          JsonObject body = response.body();
-          if (body != null) {
-            message.append(System.getProperty("line.separator"))
-              .append(body.encodePrettily());
-          }
-          LOGGER.error(message.toString());
-          context.fail(502);
-        }
-      }, t -> onError(context, t));
-  }
-
-  private void onError(RoutingContext context, Throwable t) {
-    if (t instanceof HttpServerVerticle.UnauthorizedThrowable) {
-      context.fail(403);
-    } else {
-      context.fail(t);
-    }
-  }
-
-  private static final class UnauthorizedThrowable extends Throwable {
-    UnauthorizedThrowable(String message) {
-      super(message, null, false, false);
-    }
   }
 }

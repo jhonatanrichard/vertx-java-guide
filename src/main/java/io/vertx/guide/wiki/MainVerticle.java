@@ -2,7 +2,6 @@ package io.vertx.guide.wiki;
 
 import io.reactivex.Single;
 import io.vertx.core.DeploymentOptions;
-import io.vertx.core.Future;
 import io.vertx.core.Promise;
 import io.vertx.reactivex.core.AbstractVerticle;
 
@@ -16,19 +15,11 @@ public class MainVerticle extends AbstractVerticle {
   @Override
   public void start(Promise<Void> promise) throws Exception {
 
-    Single<String> dbVerticleDeployment = vertx.rxDeployVerticle(
-      "io.vertx.guide.wiki.database.WikiDatabaseVerticle");
+    Single<String> dbVerticleDeployment = vertx.rxDeployVerticle("io.vertx.guide.wiki.database.WikiDatabaseVerticle");
 
+    DeploymentOptions opts = new DeploymentOptions().setInstances(2);
     dbVerticleDeployment
-      .flatMap(id -> { // 1. The flatMap operator applies the function to the result of dbVerticleDeployment. Here it schedules the deployment of the HttpServerVerticle.
-
-        Single<String> httpVerticleDeployment = vertx.rxDeployVerticle(
-          "io.vertx.guide.wiki.http.HttpServerVerticle",
-          new DeploymentOptions().setInstances(2));
-
-        return httpVerticleDeployment;
-      })
-      .flatMap(id -> vertx.rxDeployVerticle("io.vertx.guide.wiki.http.AuthInitializerVerticle")) // 2. We use the shorter lambda form here.
-      .subscribe(id -> promise.complete(), promise::fail); // 3. Operations start when subscribing. On success or on error, the MainVerticle start future is either completed or failed.
+      .flatMap(id -> vertx.rxDeployVerticle("io.vertx.guide.wiki.http.HttpServerVerticle", opts))
+      .subscribe(id -> promise.complete(), promise::fail);
   }
 }
