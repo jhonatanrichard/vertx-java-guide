@@ -1,40 +1,26 @@
-
 package io.vertx.guide.wiki.http;
 
 import com.github.rjeschke.txtmark.Processor;
-import io.reactivex.Completable;
 import io.reactivex.Flowable;
-import io.reactivex.Single;
 import io.vertx.core.Promise;
-import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
-import io.vertx.core.net.JksOptions;
-import io.vertx.ext.auth.PubSecKeyOptions;
-import io.vertx.ext.auth.jwt.JWTAuthOptions;
-import io.vertx.ext.jwt.JWTOptions;
-import io.vertx.ext.web.client.WebClientOptions;
+import io.vertx.ext.bridge.PermittedOptions;
+import io.vertx.ext.web.handler.sockjs.BridgeOptions;
 import io.vertx.guide.wiki.database.reactivex.WikiDatabaseService;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.core.http.HttpServer;
-import io.vertx.reactivex.ext.auth.User;
-import io.vertx.reactivex.ext.auth.jdbc.JDBCAuth;
-import io.vertx.reactivex.ext.auth.jwt.JWTAuth;
-import io.vertx.reactivex.ext.jdbc.JDBCClient;
 import io.vertx.reactivex.ext.web.Router;
 import io.vertx.reactivex.ext.web.RoutingContext;
-import io.vertx.reactivex.ext.web.client.WebClient;
-import io.vertx.reactivex.ext.web.codec.BodyCodec;
-import io.vertx.reactivex.ext.web.handler.*;
+import io.vertx.reactivex.ext.web.handler.BodyHandler;
+import io.vertx.reactivex.ext.web.handler.SessionHandler;
+import io.vertx.reactivex.ext.web.handler.StaticHandler;
+import io.vertx.reactivex.ext.web.handler.sockjs.SockJSHandler;
 import io.vertx.reactivex.ext.web.sstore.LocalSessionStore;
-import io.vertx.reactivex.ext.web.templ.freemarker.FreeMarkerTemplateEngine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
-import java.util.Date;
-
-import static io.vertx.guide.wiki.DatabaseConstants.*;
 
 public class HttpServerVerticle extends AbstractVerticle {
 
@@ -61,6 +47,19 @@ public class HttpServerVerticle extends AbstractVerticle {
 
     router.route().handler(BodyHandler.create());
     router.route().handler(SessionHandler.create(LocalSessionStore.create(vertx)));
+
+    // configurando um websocket JS
+    SockJSHandler sockJSHandler = SockJSHandler.create(vertx); // 1. Create a new SockJSHandler for this vertx instance.
+    BridgeOptions bridgeOptions = new BridgeOptions()
+      .addInboundPermitted(new PermittedOptions().setAddress("app.markdown"))  // 2. Allow delivery of messages coming from the browser on the app.markdown address. We will use this address to get the server process the Markdown content as we edit a wiki page.
+      .addOutboundPermitted(new PermittedOptions().setAddress("page.saved")); // 3. Allow sending messages going to the browser on the page.saved address. We will use this address to notify browsers that a wiki page has been modified.
+    sockJSHandler.bridge(bridgeOptions); // 4. Configure the handler to bridge SockJS traffic to the event bus.
+    router.route("/eventbus/*").handler(sockJSHandler); // 5. Handle all requests under the /eventbus path with the SockJS handler.
+
+    vertx.eventBus().<String>consumer("app.markdown", msg -> {
+      String html = Processor.process(msg.body());
+      msg.reply(html);
+    });
 
     // assets estáticos
     router.get("/app/*").handler(StaticHandler.create().setCachingEnabled(false)); // <1> <2>
@@ -104,15 +103,20 @@ public class HttpServerVerticle extends AbstractVerticle {
       t -> apiFailure(context, t));
   }
 
-  private void apiUpdatePage(RoutingContext context) {
+private void apiUpdatePage(RoutingContext context) {
     int id = Integer.valueOf(context.request().getParam("id"));
     JsonObject page = context.getBodyAsJson();
-    if (!validateJsonPageDocument(context, page, "markdown")) {
+    if (!validateJsonPageDocument(context, page, "client", "markdown")) {
       return;
     }
-    dbService.rxSavePage(id, page.getString("markdown")).subscribe(
-      () -> apiResponse(context, 200, null, null),
-      t -> apiFailure(context, t));
+    dbService.rxSavePage(id, page.getString("markdown"))
+      .doOnComplete(() -> { // 1.   rxSavePage returns a Single<Void> object. On success (i.e. no database failure) we publish an event.
+        JsonObject event = new JsonObject()
+          .put("id", id) // 2. The message contains the page identifier.
+          .put("client", page.getString("client")); // 3. The message contains the client identifier.
+        vertx.eventBus().publish("page.saved", event); // 4. The event is published on the page.saved address.
+      })
+      .subscribe(() -> apiResponse(context, 200, null, null), t -> apiFailure(context, t));
   }
 
   private boolean validateJsonPageDocument(RoutingContext context, JsonObject page, String... expectedKeys) {

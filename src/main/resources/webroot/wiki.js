@@ -1,12 +1,21 @@
 'use strict';
 
+function generateUUID() {
+  var d = new Date().getTime();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    var r = (d + Math.random() * 16) % 16 | 0;
+    d = Math.floor(d / 16);
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 angular.module("wikiApp", [])
   .controller("WikiController", ["$scope", "$http", "$timeout", function ($scope, $http, $timeout) {
 
     var DEFAULT_PAGENAME = "Example page";
     var DEFAULT_MARKDOWN = "# Example page\n\nSome text _here_.\n";
 
-    $scope.newPage = function() {
+    $scope.newPage = function () {
       $scope.pageId = undefined;
       $scope.pageName = DEFAULT_PAGENAME;
       $scope.pageMarkdown = DEFAULT_MARKDOWN;
@@ -23,6 +32,7 @@ angular.module("wikiApp", [])
     };
 
     $scope.load = function (id) {
+      $scope.pageModified = false;
       $http.get("/api/pages/" + id).then(function(response) {
         var page = response.data.page;
         $scope.pageId = page.id;
@@ -36,7 +46,7 @@ angular.module("wikiApp", [])
       document.getElementById("rendering").innerHTML = html;
     };
 
-    $scope.save = function() {
+    $scope.save = function () {
       var payload;
       if ($scope.pageId === undefined) {
         payload = {
@@ -53,6 +63,7 @@ angular.module("wikiApp", [])
         });
       } else {
         var payload = {
+          "client": clientUuid,
           "markdown": $scope.pageMarkdown
         };
         $http.put("/api/pages/" + $scope.pageId, payload).then(function(ok) {
@@ -99,16 +110,40 @@ angular.module("wikiApp", [])
     $scope.newPage();
 
     var markdownRenderingPromise = null;
-    $scope.$watch("pageMarkdown", function(text) {  // $scope.$watch allows being notified of state changes. Here we monitor changes on the pageMarkdown property that is bound to the editor textarea.
+    $scope.$watch("pageMarkdown", function (text) {
+      if (eb.state !== EventBus.OPEN) return;
       if (markdownRenderingPromise !== null) {
-        $timeout.cancel(markdownRenderingPromise);  // Timeouts are promise, so if the state has changed we cancel the previous one and create a new one. This is how we delay rendering instead of doing it on every keystroke.
+        $timeout.cancel(markdownRenderingPromise);
       }
       markdownRenderingPromise = $timeout(function() {
         markdownRenderingPromise = null;
-        $http.post("/app/markdown", text).then(function(response) { // 4. We ask the backend to render the editor text into some HTML, then refresh the preview.
-          $scope.updateRendering(response.data);
+        
+        eb.send("app.markdown", text, function (err, reply) { // 1. The reply handler is a function taking two parameters: an error (if any) and the reply object. The reply object content is nested inside the body property.
+          if (err === null) {
+            $scope.$apply(function () { // 2. Since the event bus client is not managed by AngularJS, $scope.$apply wraps the callback to perform proper scope life-cycle.
+              $scope.updateRendering(reply.body); // 3. As we did when working with $http, we invoke updateRendering with the HTML result.
+            });
+          } else {
+            console.warn("Error rendering Markdown content: " + JSON.stringify(err));
+          }
         });
-      }, 300); // 300 milliseconds is a fine delay to trigger rendering if nothing has changed in the editor.
+
+      }, 300);
     });
+
+
+    var eb = new EventBus(window.location.protocol + "//" + window.location.host + "/eventbus");
+    var clientUuid = generateUUID(); // 1. We do not want to print the warning if we modified the content ourselves so we need a client identifier.
+    eb.onopen = function () {
+      eb.registerHandler("page.saved", function (error, message) { // 2. The callback will be invoked when a message is received on the page.saved address.
+        if (message.body // 3. Check that the body is not empty.
+          && $scope.pageId === message.body.id // 4. Make sure this event is related to the current wiki page.
+          && clientUuid !== message.body.client) { // 5. Check that we are not the origin of the changes.
+          $scope.$apply(function () { // 6. Since the event bus client is not managed by AngularJS, $scope.$apply wraps the callback to perform proper scope life cycle.
+            $scope.pageModified = true; // 7. Set pageModified to true.
+          });
+        }
+      });
+    };
 
   }]);
