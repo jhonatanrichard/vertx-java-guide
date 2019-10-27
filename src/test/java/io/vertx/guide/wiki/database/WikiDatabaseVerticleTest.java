@@ -10,6 +10,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import io.vertx.guide.wiki.database.reactivex.WikiDatabaseService;
 
 // With that runner, JUnit test and life-cycle methods accept a TestContext argument. 
 // This object provides access to basic assertions, a context to store data, and several 
@@ -23,15 +24,12 @@ public class WikiDatabaseVerticleTest {
   @Before
   public void prepare(TestContext context) throws InterruptedException {
     vertx = Vertx.vertx();
-
-    JsonObject conf = new JsonObject() // Nós somente sobrescrevemos algumas das configurações do verticle, as outras continuam as default
-        .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true")
-        .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
-
+    JsonObject conf = new JsonObject()
+      .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true")
+      .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
     vertx.deployVerticle(new WikiDatabaseVerticle(), new DeploymentOptions().setConfig(conf),
-        context.asyncAssertSuccess(id -> // asyncAssertSuccess is useful to provide a handler that checks for the success of an asynchronous operation. 
-        // There is a variant with no arguments, and a variant like this one where we can chain the result to another handler.
-        service = WikiDatabaseService.createProxy(vertx, WikiDatabaseVerticle.CONFIG_WIKIDB_QUEUE)));
+      context.asyncAssertSuccess(id ->
+        service = io.vertx.guide.wiki.database.WikiDatabaseService.createProxy(vertx, WikiDatabaseVerticle.CONFIG_WIKIDB_QUEUE)));
   }
 
   @After
@@ -40,15 +38,31 @@ public class WikiDatabaseVerticleTest {
     vertx.close(context.asyncAssertSuccess());
   }
 
-  @Test // (timeout=5000)
-  // There is a default (long) timeout for asynchronous test cases, but it can be overridden through the JUnit @Test annotation.
-  public void async_behavior(TestContext context) { // TestContext is a parameter provided by the runner.
-    Vertx vertx = Vertx.vertx(); // since we are in unit tests, we need to create a Vert.x context.
-    context.assertEquals("foo", "foo"); // Here is an example of a basic TestContext assertion.
-    Async a1 = context.async(); // We get a first Async object that can later be completed (or failed).
-    Async a2 = context.async(3); // This Async object works as a countdown that completes successfully after 3 calls.
-    vertx.setTimer(100, n -> a1.complete()); // We complete when the timer fires.
-    vertx.setPeriodic(100, n -> a2.countDown()); // Each periodic task tick triggers a countdown. The test passes when all Async objects have completed.
+  @Test
+  public void test_fetchAllPagesData(TestContext context) {
+    Async async = context.async();
+
+    service.createPage("A", "abc", context.asyncAssertSuccess(p1 -> {
+      service.createPage("B", "123", context.asyncAssertSuccess(p2 -> {
+        service.fetchAllPagesData(context.asyncAssertSuccess(data -> {
+
+          context.assertEquals(2, data.size());
+
+          JsonObject a = data.get(0);
+          context.assertEquals("A", a.getString("NAME"));
+          context.assertEquals("abc", a.getString("CONTENT"));
+
+          JsonObject b = data.get(1);
+          context.assertEquals("B", b.getString("NAME"));
+          context.assertEquals("123", b.getString("CONTENT"));
+
+          async.complete();
+
+        }));
+      }));
+    }));
+
+    async.awaitSuccess(5000);
   }
 
   @Test
@@ -74,7 +88,7 @@ public class WikiDatabaseVerticleTest {
 
                 service.fetchAllPages(context.asyncAssertSuccess(array2 -> {
                   context.assertTrue(array2.isEmpty());
-                  async.complete(); // This is where the sole Async eventually completes.
+                  async.complete();
                 }));
               });
             }));
@@ -82,7 +96,6 @@ public class WikiDatabaseVerticleTest {
         }));
       }));
     }));
-    async.awaitSuccess(5000); // This is an alternative to exiting the test case method and relying on a JUnit timeout. 
-    // Here the execution on the test case thread waits until either the Async completes or the timeout period elapses.
+    async.awaitSuccess(5000);
   }
 }

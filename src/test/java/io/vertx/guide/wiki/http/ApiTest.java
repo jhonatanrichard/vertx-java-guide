@@ -20,7 +20,6 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-
 @RunWith(VertxUnitRunner.class)
 public class ApiTest {
 
@@ -29,12 +28,11 @@ public class ApiTest {
   private String jwtTokenHeaderValue;
 
   @Before
-  // The HTTP server verticle needs the database verticle to be running, so we need to deploy both in our test Vert.x context
   public void prepare(TestContext context) {
     vertx = Vertx.vertx();
 
     JsonObject dbConf = new JsonObject()
-      .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true") // 1. We use a different JDBC URL to use an in-memory database for the tests.
+      .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_URL, "jdbc:hsqldb:mem:testdb;shutdown=true")
       .put(WikiDatabaseVerticle.CONFIG_WIKIDB_JDBC_MAX_POOL_SIZE, 4);
 
     vertx.deployVerticle(new AuthInitializerVerticle(),
@@ -46,10 +44,10 @@ public class ApiTest {
     vertx.deployVerticle(new HttpServerVerticle(), context.asyncAssertSuccess());
 
     webClient = WebClient.create(vertx, new WebClientOptions()
-    .setDefaultHost("localhost")
-    .setDefaultPort(8080)
-    .setSsl(true) // 1. garante ssl
-    .setTrustOptions(new JksOptions().setPath("server-keystore.jks").setPassword("secret"))); // 2. Since the certificate is self-signed, we need to explicitly trust it otherwise the web client connections will fail just like a web browser would.
+      .setDefaultHost("localhost")
+      .setDefaultPort(8080)
+      .setSsl(true)
+      .setTrustOptions(new JksOptions().setPath("server-keystore.jks").setPassword("secret")));
   }
 
   @After
@@ -58,28 +56,26 @@ public class ApiTest {
   }
 
   @Test
-  // The proper test case is a simple scenario where all types of requests are being made. It creates a page, fetches it, updates it then deletes it
   public void play_with_api(TestContext context) {
     Async async = context.async();
 
     Promise<HttpResponse<String>> tokenPromise = Promise.promise();
     webClient.get("/api/token")
-      .putHeader("login", "foo")  // 1. Credentials are passed as headers.
+      .putHeader("login", "foo")
       .putHeader("password", "bar")
-      .as(BodyCodec.string())   // 2. The response payload is of text/plain type, so we use that for the body decoding codec.
+      .as(BodyCodec.string())
       .send(tokenPromise);
-    Future<HttpResponse<String>> tokenFuture = tokenPromise.future(); // 3. Upon success we complete the tokenRequest future with the token value.
+    Future<HttpResponse<String>> tokenFuture = tokenPromise.future();
 
     JsonObject page = new JsonObject()
       .put("name", "Sample")
       .put("markdown", "# A page");
-    // (...)
 
     Future<HttpResponse<JsonObject>> postPageFuture = tokenFuture.compose(tokenResponse -> {
       Promise<HttpResponse<JsonObject>> promise = Promise.promise();
-      jwtTokenHeaderValue = "Bearer " + tokenResponse.body();   // 1. We store the token with the Bearer prefix to the field for the next requests.
+      jwtTokenHeaderValue = "Bearer " + tokenResponse.body();
       webClient.post("/api/pages")
-        .putHeader("Authorization", jwtTokenHeaderValue)  // 2. We pass the token as a header.
+        .putHeader("Authorization", jwtTokenHeaderValue)
         .as(BodyCodec.jsonObject())
         .sendJsonObject(page, promise);
       return promise.future();
@@ -93,7 +89,6 @@ public class ApiTest {
         .send(promise);
       return promise.future();
     });
-    // (...)
 
     Future<HttpResponse<JsonObject>> updatePageFuture = getPageFuture.compose(resp -> {
       JsonArray array = resp.body().getJsonArray("pages");
