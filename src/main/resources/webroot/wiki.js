@@ -99,16 +99,16 @@ angular.module("wikiApp", [])
     $scope.newPage();
 
     var markdownRenderingPromise = null;
-    $scope.$watch("pageMarkdown", function(text) {  
+    $scope.$watch("pageMarkdown", function(text) {  // $scope.$watch allows being notified of state changes. Here we monitor changes on the pageMarkdown property that is bound to the editor textarea.
       if (markdownRenderingPromise !== null) {
-        $timeout.cancel(markdownRenderingPromise);  
+        $timeout.cancel(markdownRenderingPromise);  // Timeouts are promise, so if the state has changed we cancel the previous one and create a new one. This is how we delay rendering instead of doing it on every keystroke.
       }
       markdownRenderingPromise = $timeout(function() {
         markdownRenderingPromise = null;
-        $http.post("/app/markdown", text).then(function(response) { 
+        $http.post("/app/markdown", text).then(function(response) { // 4. We ask the backend to render the editor text into some HTML, then refresh the preview.
           $scope.updateRendering(response.data);
         });
-      }, 300); 
+      }, 300); // 300 milliseconds is a fine delay to trigger rendering if nothing has changed in the editor.
     });
 
   }]);

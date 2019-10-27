@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="en" ng-app="wikiApp"> 
+<html lang="en" ng-app="wikiApp"> <!-- The AngularJS module is named wikiApp -->
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.7.5/angular.min.js"></script>
   <script src="https://cdn.jsdelivr.net/lodash/4.17.4/lodash.min.js"></script>
-  <script src="/app/wiki.js"></script> 
+  <script src="/app/wiki.js"></script> <!-- wiki.js holds the code for our AngularJS module and controller -->
   <style>
     body {
       padding-top: 2rem;
@@ -31,11 +31,13 @@
         </button>
         <div class="dropdown-menu" aria-labelledby="pageDropdownButton">
           <a ng-repeat="page in pages track by page.id" class="dropdown-item" ng-click="load(page.id)" href="#">{{page.name}}</a>
+          <!-- For each wiki page name we generate an element using ng-repeat and ng-click to define the controller action (load) when it is being clicked.-->
         </div>
       </span>
       <span>
         <button type="button" class="btn btn-secondary" ng-click="reload()"><i class="fa fa-refresh"
                                                                                aria-hidden="true"></i> Reload</button>
+                                                                               <!-- The refresh button is bound to the reload controller action. All other buttons work the same way. -->
       </span>
       <span>
         <button type="button" class="btn btn-secondary" ng-click="newPage()"><i class="fa fa-plus-square"
@@ -44,11 +46,11 @@
       <span class="float-right">
         <button type="button" class="btn btn-secondary" ng-click="delete()" ng-show="pageExists()"><i
           class="fa fa-trash"
-          aria-hidden="true"></i> Delete page</button> 
+          aria-hidden="true"></i> Delete page</button> <!-- The ng-show directive allows us to show or hide the element depending on the controller pageExists method value. -->
       </span>
     </div>
 
-    <div class="col-md-12">
+    <div class="col-md-12"> <!-- This div is used to display notifications of success or failures. -->
       <div class="invisible alert" role="alert" id="alertMessage">
         {{alertMessage}}
       </div>
@@ -64,7 +66,7 @@
       <form>
         <div class="form-group">
           <label for="markdown">Markdown</label>
-          <textarea id="markdown" class="form-control" rows="25" ng-model="pageMarkdown"></textarea> <!--1-->
+          <textarea id="markdown" class="form-control" rows="25" ng-model="pageMarkdown"></textarea> <!--1 ng-model binds the textarea content to the pageMarkdown property of the controller. -->
         </div>
         <div class="form-group">
           <label for="pageName">Name</label>
