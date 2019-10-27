@@ -25,6 +25,17 @@ import java.util.List;
 // to pass other types is service reference types.
 public interface WikiDatabaseService {
 
+    @GenIgnore
+    static WikiDatabaseService create(JDBCClient dbClient, HashMap<SqlQuery, String> sqlQueries, Handler<AsyncResult<WikiDatabaseService>> readyHandler) {
+      return new WikiDatabaseServiceImpl(dbClient, sqlQueries, readyHandler);
+    }
+  
+    @GenIgnore
+    static io.vertx.guide.wiki.database.reactivex.WikiDatabaseService createProxy(Vertx vertx, String address) {
+      return new io.vertx.guide.wiki.database.reactivex.WikiDatabaseService(new WikiDatabaseServiceVertxEBProxy(vertx, address));
+    }
+  
+
     // The Fluent annotation is optional, but allows fluent interfaces where
     // operations can be chained by returning the service instance. This is mostly
     // useful for the code generator when the service shall be consumed from other
@@ -39,6 +50,9 @@ public interface WikiDatabaseService {
     WikiDatabaseService fetchPage(String name, Handler<AsyncResult<JsonObject>> resultHandler);
 
     @Fluent
+    WikiDatabaseService fetchPageById(int id, Handler<AsyncResult<JsonObject>> resultHandler);
+
+    @Fluent
     WikiDatabaseService createPage(String title, String markdown, Handler<AsyncResult<Void>> resultHandler);
 
     @Fluent
@@ -49,18 +63,4 @@ public interface WikiDatabaseService {
 
     @Fluent
     WikiDatabaseService fetchAllPagesData(Handler<AsyncResult<List<JsonObject>>> resultHandler);
-
-    @GenIgnore
-    static WikiDatabaseService create(JDBCClient dbClient, HashMap<SqlQuery, String> sqlQueries,
-            Handler<AsyncResult<WikiDatabaseService>> readyHandler) {
-        return new WikiDatabaseServiceImpl(dbClient, sqlQueries, readyHandler);
-    }
-
-    @GenIgnore
-    static WikiDatabaseService createProxy(Vertx vertx, String address) {
-        return new WikiDatabaseServiceVertxEBProxy(vertx, address); // The Vert.x code generator creates the proxy class and names it by suffixing with VertxEBProxy.
-    }
-
-    @Fluent
-    WikiDatabaseService fetchPageById(int id, Handler<AsyncResult<JsonObject>> resultHandler);
 }

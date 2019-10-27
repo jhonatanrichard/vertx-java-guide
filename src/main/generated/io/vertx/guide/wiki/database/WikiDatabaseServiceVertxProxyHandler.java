@@ -126,6 +126,11 @@ public class WikiDatabaseServiceVertxProxyHandler extends ProxyHandler {
                         HelperUtils.createHandler(msg));
           break;
         }
+        case "fetchPageById": {
+          service.fetchPageById(json.getValue("id") == null ? null : (json.getLong("id").intValue()),
+                        HelperUtils.createHandler(msg));
+          break;
+        }
         case "createPage": {
           service.createPage((java.lang.String)json.getValue("title"),
                         (java.lang.String)json.getValue("markdown"),
@@ -145,11 +150,6 @@ public class WikiDatabaseServiceVertxProxyHandler extends ProxyHandler {
         }
         case "fetchAllPagesData": {
           service.fetchAllPagesData(HelperUtils.createListHandler(msg));
-          break;
-        }
-        case "fetchPageById": {
-          service.fetchPageById(json.getValue("id") == null ? null : (json.getLong("id").intValue()),
-                        HelperUtils.createHandler(msg));
           break;
         }
         default: throw new IllegalStateException("Invalid action: " + action);

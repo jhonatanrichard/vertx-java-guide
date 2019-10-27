@@ -86,6 +86,17 @@ public class WikiDatabaseService {
     });
   }
 
+  public io.vertx.guide.wiki.database.reactivex.WikiDatabaseService fetchPageById(int id, Handler<AsyncResult<JsonObject>> resultHandler) { 
+    delegate.fetchPageById(id, resultHandler);
+    return this;
+  }
+
+  public Single<JsonObject> rxFetchPageById(int id) { 
+    return io.vertx.reactivex.impl.AsyncResultSingle.toSingle(handler -> {
+      fetchPageById(id, handler);
+    });
+  }
+
   public io.vertx.guide.wiki.database.reactivex.WikiDatabaseService createPage(String title, String markdown, Handler<AsyncResult<Void>> resultHandler) { 
     delegate.createPage(title, markdown, resultHandler);
     return this;
@@ -127,17 +138,6 @@ public class WikiDatabaseService {
   public Single<List<JsonObject>> rxFetchAllPagesData() { 
     return io.vertx.reactivex.impl.AsyncResultSingle.toSingle(handler -> {
       fetchAllPagesData(handler);
-    });
-  }
-
-  public io.vertx.guide.wiki.database.reactivex.WikiDatabaseService fetchPageById(int id, Handler<AsyncResult<JsonObject>> resultHandler) { 
-    delegate.fetchPageById(id, resultHandler);
-    return this;
-  }
-
-  public Single<JsonObject> rxFetchPageById(int id) { 
-    return io.vertx.reactivex.impl.AsyncResultSingle.toSingle(handler -> {
-      fetchPageById(id, handler);
     });
   }
 
